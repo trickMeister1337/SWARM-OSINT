@@ -616,7 +616,7 @@ phase_github_dorking() {
         timeout 300 trufflehog "${th_args[@]}" \
             2>/dev/null > "$OUTDIR/github_leaks/trufflehog.json" || true
 
-        leaks_found=$(grep -c '"SourceMetadata"' "$OUTDIR/github_leaks/trufflehog.json" 2>/dev/null || echo 0)
+        leaks_found=$(grep -c '"SourceMetadata"' "$OUTDIR/github_leaks/trufflehog.json" 2>/dev/null) || leaks_found=0
         if [ "$leaks_found" -gt 0 ]; then
             warn "trufflehog → ${leaks_found} segredos potenciais encontrados!"
         else
