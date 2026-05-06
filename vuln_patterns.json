@@ -1,0 +1,352 @@
+{
+  "sqli": {
+    "description": "SQL Injection indicators in HTTP response body",
+    "patterns": [
+      "sql syntax",
+      "mysql_fetch",
+      "mysql_num_rows",
+      "mysql_query",
+      "ORA-[0-9]{5}",
+      "PostgreSQL.*ERROR",
+      "PostgreSQL query failed",
+      "unterminated quoted string",
+      "you have an error in your sql",
+      "warning: mysql",
+      "sqlite_",
+      "microsoft ole db",
+      "jdbc exception",
+      "sqlexception",
+      "pg_query",
+      "odbc driver",
+      "syntax error.*near",
+      "unexpected end of sql",
+      "division by zero",
+      "conversion failed when converting",
+      "invalid column name",
+      "HibernateException",
+      "org\\.hibernate\\.exception",
+      "com\\.mysql\\.jdbc\\.exceptions",
+      "java\\.sql\\.SQLException",
+      "System\\.Data\\.SqlClient",
+      "SqlException",
+      "Unclosed quotation mark after the character string",
+      "incorrect syntax near",
+      "OLE DB.*error",
+      "mysqli_fetch",
+      "pg_exec\\(\\)",
+      "Warning.*mysql_",
+      "You have an error in your SQL syntax"
+    ],
+    "crash_indicators": [
+      "500",
+      "503"
+    ],
+    "confidence_on_match": 97,
+    "confidence_on_crash": 65,
+    "confidence_baseline": 35
+  },
+  "xss": {
+    "description": "Cross-Site Scripting - payload reflected in response",
+    "patterns": [
+      "<script[^>]*>",
+      "alert\\(",
+      "javascript:",
+      "onerror=",
+      "onload=",
+      "eval\\(",
+      "document\\.cookie"
+    ],
+    "confidence_on_match": 97,
+    "confidence_baseline": 25
+  },
+  "lfi": {
+    "description": "Local File Inclusion - system file content in response",
+    "patterns": [
+      "root:x:0:0",
+      "/bin/bash",
+      "/bin/sh",
+      "/usr/sbin",
+      "\\[boot loader\\]",
+      "windows\\\\system32",
+      "\\[extensions\\]",
+      "<?php",
+      "daemon:x:",
+      "/etc/hostname",
+      "\\[drivers\\]",
+      "\\[boot loader\\]",
+      "for 16-bit app support",
+      "WINDOWS",
+      "java\\.io\\.FileNotFoundException",
+      "at org\\.springframework",
+      "include\\(\\): Failed opening",
+      "require_once\\(\\): Failed",
+      "Warning: include"
+    ],
+    "confidence_on_match": 99,
+    "confidence_baseline": 30
+  },
+  "ssrf": {
+    "description": "Server-Side Request Forgery",
+    "patterns": [
+      "169\\.254\\.169\\.254",
+      "internal.*server.*error",
+      "connection refused",
+      "connection timed out",
+      "metadata.*aws",
+      "ami-id",
+      "RequestId",
+      "InstanceId",
+      "accountId",
+      "privateIp",
+      "local-ipv4",
+      "public-hostname"
+    ],
+    "confidence_on_match": 95,
+    "confidence_baseline": 40
+  },
+  "cors": {
+    "description": "CORS Misconfiguration - check response headers",
+    "header_patterns": {
+      "access-control-allow-origin": {
+        "evil.com": {
+          "confidence": 97,
+          "note": "Reflects arbitrary origin"
+        },
+        "null": {
+          "confidence": 90,
+          "note": "Accepts null origin"
+        },
+        "*": {
+          "confidence": 75,
+          "note": "Wildcard CORS"
+        }
+      },
+      "access-control-allow-credentials": {
+        "true": {
+          "confidence_bonus": 20,
+          "note": "credentials=true elevates risk"
+        }
+      }
+    },
+    "confidence_baseline": 15
+  },
+  "default_login": {
+    "description": "Default credentials - successful auth indicators",
+    "success_patterns": [
+      "dashboard",
+      "logout",
+      "welcome",
+      "bem-vindo",
+      "signed in",
+      "my account",
+      "minha conta",
+      "profile",
+      "perfil",
+      "administrator",
+      "administrador"
+    ],
+    "auth_header_indicators": [
+      "set-cookie",
+      "authorization",
+      "x-auth-token",
+      "x-session"
+    ],
+    "session_cookie_patterns": [
+      "session",
+      "token",
+      "auth",
+      "jwt",
+      "sid",
+      "phpsessid"
+    ],
+    "confidence_on_auth_evidence": 98,
+    "confidence_on_body_match": 90,
+    "confidence_baseline": 25
+  },
+  "exposure": {
+    "description": "Sensitive data exposure - config format pattern",
+    "config_pattern": "(?:password|secret|api_key|token|database_url|connection_string|db_pass|db_user|private_key|aws_access|aws_secret)\\s*[=:]\\s*[^\\s<]{4,}",
+    "high_confidence_patterns": [
+      "-----BEGIN.*PRIVATE KEY",
+      "AKIA[0-9A-Z]{16}",
+      "AIza[0-9A-Za-z\\-_]{35}",
+      "DB_PASSWORD=",
+      "DATABASE_URL=postgres",
+      "spring\\.datasource\\.password",
+      "MONGO_URI=mongodb",
+      "REDIS_URL=redis://",
+      "AWS_SECRET_ACCESS_KEY="
+    ],
+    "medium_confidence_patterns": [
+      "password",
+      "secret",
+      "api_key",
+      "private_key",
+      "aws_access",
+      "database_url",
+      "connection_string"
+    ],
+    "confidence_on_config_match": 95,
+    "confidence_on_high_pattern": 97,
+    "confidence_on_medium_pattern": 75,
+    "confidence_baseline": 55
+  },
+  "redirect": {
+    "description": "Open Redirect",
+    "malicious_destinations": [
+      "evil.com",
+      "//evil",
+      "@",
+      "javascript:"
+    ],
+    "confidence_on_match": 95,
+    "confidence_baseline": 45
+  },
+  "takeover": {
+    "description": "Subdomain Takeover - inactive service indicators",
+    "patterns": [
+      "there is no app here",
+      "no such app",
+      "repository not found",
+      "isn't available",
+      "heroku.*no such app",
+      "github pages.*404",
+      "domain not configured",
+      "this site can't be reached",
+      "no such bucket",
+      "nosuchbucket",
+      "fastly error",
+      "the specified bucket does not exist"
+    ],
+    "confidence_on_match": 96,
+    "confidence_baseline": 25
+  },
+  "safe_payload_substitutes": {
+    "description": "Values to substitute payloads for baseline comparison",
+    "default": "safe-test-value",
+    "numeric": "1",
+    "string": "safe-test",
+    "path": "/safe-path"
+  },
+  "normalization": {
+    "description": "Patterns to strip from responses before diff",
+    "dynamic_tokens": [
+      "_token=[a-zA-Z0-9+/=]{20,}",
+      "csrf[_-]?token[\"']?\\s*[=:][\"']?\\s*[a-zA-Z0-9+/=]{10,}",
+      "nonce[\"']?\\s*[=:][\"']?\\s*[a-zA-Z0-9]{8,}",
+      "expires=[^;\\s]+",
+      "max-age=\\d+",
+      "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}",
+      "timestamp[\"']?\\s*[=:]\\s*\\d{10,13}",
+      "request_id[\"']?\\s*[=:][\"']?\\s*[a-zA-Z0-9\\-]{8,}",
+      "Set-Cookie:.*session[^\\r\\n]*",
+      "ETag:\\s*[^\\r\\n]+",
+      "Date:\\s*[^\\r\\n]+"
+    ]
+  },
+  "stack_fingerprints": {
+    "description": "Technology stack fingerprints from response headers and body",
+    "java_spring": {
+      "headers": [
+        "x-application-context",
+        "x-powered-by: Spring"
+      ],
+      "body_patterns": [
+        "Whitelabel Error Page",
+        "org\\.springframework\\.",
+        "javax\\.servlet\\.",
+        "application\\.properties",
+        "Spring Boot"
+      ],
+      "error_patterns": [
+        "org\\.springframework\\.web\\.servlet",
+        "DispatcherServlet",
+        "BeanCreationException"
+      ]
+    },
+    "dotnet": {
+      "headers": [
+        "x-powered-by: ASP.NET",
+        "x-aspnet-version",
+        "x-aspnetmvc-version"
+      ],
+      "body_patterns": [
+        "ViewState",
+        "__EVENTVALIDATION",
+        "System\\.Web\\.",
+        "aspx",
+        "Microsoft .NET Framework"
+      ],
+      "error_patterns": [
+        "Server Error in '/' Application",
+        "Stack Trace:",
+        "System\\.NullReferenceException"
+      ]
+    },
+    "php_laravel": {
+      "headers": [
+        "x-powered-by: PHP",
+        "set-cookie: laravel_session"
+      ],
+      "body_patterns": [
+        "laravel_session",
+        "XSRF-TOKEN",
+        "_token.*[a-zA-Z0-9]{40}",
+        "Illuminate\\\\",
+        "Laravel"
+      ],
+      "error_patterns": [
+        "Whoops, looks like something went wrong",
+        "ErrorException",
+        "Illuminate\\\\Database\\\\QueryException"
+      ]
+    },
+    "php_wordpress": {
+      "headers": [],
+      "body_patterns": [
+        "wp-content/",
+        "wp-includes/",
+        "WordPress",
+        "wp-json"
+      ]
+    },
+    "nodejs": {
+      "headers": [
+        "x-powered-by: Express"
+      ],
+      "body_patterns": [
+        "Cannot GET /",
+        "SyntaxError: Unexpected",
+        "at Object.<anonymous>",
+        "node_modules"
+      ]
+    }
+  },
+  "auth_bypass": {
+    "description": "Authorization bypass via header manipulation",
+    "indicators": [
+      "x-middleware-subrequest",
+      "x-forwarded-for",
+      "x-real-ip",
+      "x-original-url"
+    ],
+    "bypass_confirmed_indicators": [
+      "dashboard",
+      "admin",
+      "authenticated",
+      "welcome",
+      "api-key",
+      "token"
+    ],
+    "bypass_failed_indicators": [
+      "unauthorized",
+      "forbidden",
+      "access denied",
+      "login required"
+    ],
+    "confidence_on_diff": 90,
+    "confidence_on_access": 60,
+    "confidence_baseline": 15,
+    "notes": "Comparar baseline (sem header) com payload (com header). Se diff > 20%, bypass confirmado."
+  }
+}
