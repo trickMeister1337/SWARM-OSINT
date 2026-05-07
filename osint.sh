@@ -1013,12 +1013,13 @@ phase_report() {
 
     python3 - "$_outdir" "$_domain" "$_version" \
               "$_subdomains" "$_emails" "$_urls" "$_leaks" "$_buckets" << 'PYEOF'
-import sys, os, html, datetime
+import sys, os, html as H, datetime
 
 outdir, domain, version  = sys.argv[1], sys.argv[2], sys.argv[3]
 subdomains, emails, urls = int(sys.argv[4]), int(sys.argv[5]), int(sys.argv[6])
 leaks, buckets           = int(sys.argv[7]), int(sys.argv[8])
-ts_now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+now = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+esc = lambda s: H.escape(str(s)) if s else ""
 
 def read_lines(name, limit=500):
     path = os.path.join(outdir, name)
@@ -1027,79 +1028,190 @@ def read_lines(name, limit=500):
     with open(path, errors='replace') as f:
         return f.readlines()[:limit]
 
-def table_section(title, filename, limit=300):
-    lines = read_lines(filename, limit)
+def count_lines(name):
+    return len([l for l in read_lines(name) if l.strip() and not l.startswith('#')])
+
+def table_rows(name, limit=300):
     rows = ""
-    odd = False
-    for line in lines:
+    for line in read_lines(name, limit):
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        cls = "ro" if odd else "re"
-        odd = not odd
-        rows += f'<tr class="{cls}"><td>{html.escape(line)}</td></tr>'
-    if not rows:
-        rows = '<tr><td class="empty">Nenhum dado coletado</td></tr>'
-    return f"""
-<div class="sec">
-  <h2>{html.escape(title)}</h2>
-  <table><tbody>{rows}</tbody></table>
-</div>"""
+        rows += f'<tr><td><code>{esc(line)}</code></td></tr>\n'
+    return rows or '<tr><td style="color:#999;font-style:italic">Nenhum dado coletado</td></tr>'
 
-alert_leak   = ' alert' if leaks   > 0 else ''
-alert_bucket = ' alert' if buckets > 0 else ''
+def section(sid, title, filename, limit=300, badge=None):
+    badge_html = f' <span class="cnt-badge">{badge}</span>' if badge else ""
+    rows = table_rows(filename, limit)
+    return f"""
+<h2 id="{sid}">{esc(title)}{badge_html}</h2>
+<table><thead><tr><th>Valor</th></tr></thead><tbody>
+{rows}
+</tbody></table>"""
+
+def section2(sid, title, filename, col1, col2, limit=300, badge=None):
+    badge_html = f' <span class="cnt-badge">{badge}</span>' if badge else ""
+    rows = ""
+    for line in read_lines(filename, limit):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split(",", 1) if "," in line else [line, ""]
+        rows += f'<tr><td><code>{esc(parts[0])}</code></td><td>{esc(parts[1] if len(parts)>1 else "")}</td></tr>\n'
+    if not rows:
+        rows = f'<tr><td colspan="2" style="color:#999;font-style:italic">Nenhum dado coletado</td></tr>'
+    return f"""
+<h2 id="{sid}">{esc(title)}{badge_html}</h2>
+<table><thead><tr><th>{esc(col1)}</th><th>{esc(col2)}</th></tr></thead><tbody>
+{rows}
+</tbody></table>"""
+
+CSS = """
+body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:20px;background:#f0f2f5}
+.ctn{max-width:1200px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+.hdr{background:#1a3a4f;color:#fff;padding:40px 30px;text-align:center}
+.hdr h1{margin:0 0 5px;font-size:1.6em;letter-spacing:2px;text-transform:uppercase}
+.hdr .sub{font-size:1.1em;opacity:.9;margin:5px 0}
+.hdr .meta{font-size:.85em;opacity:.7;margin:4px 0}
+.hdr .cls{display:inline-block;border:2px solid #e74c3c;color:#e74c3c;padding:4px 16px;border-radius:4px;font-weight:700;font-size:.8em;margin-top:12px;letter-spacing:1px}
+.cnt{padding:30px}
+h2{color:#1a3a4f;border-bottom:2px solid #e0e0e0;padding-bottom:8px;margin-top:30px;font-size:1.1em}
+.sts{display:flex;gap:12px;margin:20px 0;flex-wrap:wrap}
+.sc{flex:1;padding:18px;text-align:center;color:#fff;border-radius:8px;min-width:90px}
+.sc .n{font-size:32px;font-weight:bold}
+.sc .l{font-size:.75em;text-transform:uppercase;letter-spacing:.5px;opacity:.9;margin-top:4px}
+.s-ok{background:#4a7c8c}.s-warn{background:#d4833a}.s-crit{background:#7a2e2e}.s-neu{background:#2c3e50}.s-info{background:#6e8f72}
+.ib{background:#e8f4f8;padding:15px 20px;border-radius:8px;margin:15px 0;border-left:4px solid #1a3a4f}
+.ib.warn{border-left-color:#d4833a;background:#fdf3e3}
+.ib.crit{border-left-color:#7a2e2e;background:#fdf0f0}
+table{width:100%;border-collapse:collapse;margin:10px 0;font-size:.88em}
+th,td{border:1px solid #ddd;padding:9px 12px;text-align:left;vertical-align:top}
+th{background:#f5f5f5;font-weight:600;font-size:.85em;color:#2c3e50}
+code{background:#f4f4f4;padding:1px 5px;border-radius:3px;font-size:.85em;font-family:'Cascadia Code',Consolas,monospace;word-break:break-all}
+.toc{background:#f8f9fa;padding:15px 20px;border-radius:8px;margin:15px 0}
+.toc a{color:#1a3a4f;text-decoration:none}.toc a:hover{text-decoration:underline}
+.toc li{margin:4px 0}
+.cnt-badge{background:#555;color:#fff;padding:2px 10px;border-radius:10px;font-size:.7em;font-weight:700;vertical-align:middle;margin-left:6px}
+.badge-crit{background:#7a2e2e}.badge-warn{background:#d4833a}.badge-ok{background:#4a7c8c}
+.ft{background:#f5f5f5;padding:20px;text-align:center;font-size:.8em;color:#666}
+"""
+
+# Níveis de risco para leaks e buckets
+leak_cls  = "s-crit" if leaks  > 0 else "s-info"
+buck_cls  = "s-warn" if buckets > 0 else "s-info"
+leak_ib   = ('<div class="ib crit"><strong>⚠ Vazamentos encontrados:</strong> '
+             f'{leaks} conta(s) em breach databases. Verificar leaked_creds.csv.</div>') if leaks > 0 else ""
+buck_ib   = ('<div class="ib warn"><strong>⚠ Buckets cloud identificados:</strong> '
+             f'{buckets} bucket(s) S3/Azure. Verificar cloud/buckets_found.csv.</div>') if buckets > 0 else ""
+
+sub_count  = count_lines("subdomains_passive.txt")
+live_count = count_lines("subdomains_live.txt")
+ep_count   = count_lines("interesting_endpoints.txt")
+cve_count  = count_lines("shodan/cves_from_shodan.txt")
+tkover     = count_lines("cloud/takeover_candidates.csv")
 
 report = f"""<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>SWARM OSINT — {html.escape(domain)}</title>
-<style>
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:'Segoe UI',Arial,sans-serif;background:#0d1117;color:#c9d1d9;font-size:13px}}
-.hdr{{background:linear-gradient(135deg,#1a1f2e,#0d1117);border-bottom:2px solid #f0a500;padding:28px 40px}}
-.hdr h1{{color:#f0a500;font-size:22px;letter-spacing:2px}}
-.hdr .meta{{color:#8b949e;margin-top:8px;font-size:12px}}
-.wrap{{max-width:1400px;margin:0 auto;padding:28px 40px}}
-.grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:28px}}
-.card{{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px;text-align:center}}
-.card .val{{font-size:30px;font-weight:bold;color:#f0a500}}
-.card .lbl{{font-size:11px;color:#8b949e;margin-top:5px;text-transform:uppercase;letter-spacing:1px}}
-.card.alert{{border-color:#da3633}}.card.alert .val{{color:#f85149}}
-.sec{{background:#161b22;border:1px solid #30363d;border-radius:8px;margin-bottom:20px;overflow:hidden}}
-.sec h2{{background:#1c2128;border-bottom:1px solid #30363d;padding:12px 20px;font-size:13px;color:#e6edf3;letter-spacing:1px}}
-table{{width:100%;border-collapse:collapse}}
-td{{padding:6px 20px;font-size:11px;font-family:Consolas,monospace;word-break:break-all}}
-.re{{background:#161b22}}.ro{{background:#1c2128}}
-td.empty{{color:#8b949e;font-style:italic;text-align:center;padding:18px}}
-.ftr{{text-align:center;color:#30363d;font-size:11px;padding:20px;margin-top:16px}}
-</style>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SWARM OSINT — {esc(domain)}</title>
+<style>{CSS}</style>
 </head>
 <body>
+<div class="ctn">
+
 <div class="hdr">
-  <h1>⚑ SWARM OSINT — Pre-Engagement Intelligence Report</h1>
-  <div class="meta">Alvo: <strong>{html.escape(domain)}</strong> &nbsp;|&nbsp; Gerado: {ts_now} &nbsp;|&nbsp; SWARM OSINT v{html.escape(version)}</div>
+  <h1>SWARM OSINT — Pre-Engagement Intelligence Report</h1>
+  <div class="sub">{esc(domain)}</div>
+  <div class="meta">Data: {now} &nbsp;|&nbsp; SWARM OSINT v{esc(version)}</div>
+  <div class="cls">CONFIDENCIAL — OSINT — DISTRIBUIÇÃO RESTRITA</div>
 </div>
-<div class="wrap">
-  <div class="grid">
-    <div class="card"><div class="val">{subdomains}</div><div class="lbl">Subdomínios</div></div>
-    <div class="card"><div class="val">{emails}</div><div class="lbl">E-mails</div></div>
-    <div class="card"><div class="val">{urls}</div><div class="lbl">URLs Históricas</div></div>
-    <div class="card{alert_leak}"><div class="val">{leaks}</div><div class="lbl">Vazamentos</div></div>
-    <div class="card{alert_bucket}"><div class="val">{buckets}</div><div class="lbl">Cloud Buckets</div></div>
-  </div>
-  {table_section("DNS Records", "dns_records.txt", 100)}
-  {table_section("Subdomínios Passivos", "subdomains_passive.txt", 500)}
-  {table_section("Subdomínios Ativos (dnsx)", "subdomains_live.txt", 500)}
-  {table_section("E-mails Coletados", "emails.txt", 200)}
-  {table_section("Endpoints Históricos (com parâmetros)", "interesting_endpoints.txt", 300)}
-  {table_section("Cloud — Buckets Identificados", "cloud/buckets_found.csv", 100)}
-  {table_section("Cloud — Candidatos Subdomain Takeover", "cloud/takeover_candidates.csv", 100)}
-  {table_section("Shodan — Serviços Expostos", "shodan/exposed_services.txt", 100)}
-  {table_section("Shodan — CVEs Identificados", "shodan/cves_from_shodan.txt", 100)}
-  {table_section("Email Security (SPF/DMARC/DKIM)", "email_security.txt", 50)}
+
+<div class="cnt">
+
+<div class="toc"><strong>Índice</strong><ol>
+<li><a href="#s1">Sumário Executivo</a></li>
+<li><a href="#s2">Domain Intelligence</a></li>
+<li><a href="#s3">Subdomínios</a></li>
+<li><a href="#s4">E-mails &amp; Funcionários</a></li>
+<li><a href="#s5">URLs Históricas &amp; Endpoints</a></li>
+<li><a href="#s6">GitHub Dorking</a></li>
+<li><a href="#s7">Vazamentos (HIBP)</a></li>
+<li><a href="#s8">Shodan Intelligence</a></li>
+<li><a href="#s9">Cloud Surface</a></li>
+<li><a href="#s10">Email Security</a></li>
+</ol></div>
+
+<h2 id="s1">Sumário Executivo</h2>
+<div class="sts">
+  <div class="sc s-neu"><div class="n">{subdomains}</div><div class="l">Subdomínios</div></div>
+  <div class="sc s-neu"><div class="n">{live_count}</div><div class="l">Ativos</div></div>
+  <div class="sc s-neu"><div class="n">{emails}</div><div class="l">E-mails</div></div>
+  <div class="sc s-neu"><div class="n">{urls}</div><div class="l">URLs Históricas</div></div>
+  <div class="sc s-neu"><div class="n">{ep_count}</div><div class="l">Endpoints</div></div>
+  <div class="sc {leak_cls}"><div class="n">{leaks}</div><div class="l">Vazamentos</div></div>
+  <div class="sc {buck_cls}"><div class="n">{buckets}</div><div class="l">Cloud Buckets</div></div>
+  <div class="sc {'s-crit' if cve_count > 0 else 's-info'}"><div class="n">{cve_count}</div><div class="l">CVEs (Shodan)</div></div>
 </div>
-<div class="ftr">SWARM OSINT v{html.escape(version)} — USO EXCLUSIVO EM AMBIENTES AUTORIZADOS</div>
+
+{leak_ib}
+{buck_ib}
+{'<div class="ib warn"><strong>⚠ Candidatos a subdomain takeover:</strong> ' + str(tkover) + ' subdomínio(s). Verificar cloud/takeover_candidates.csv.</div>' if tkover > 0 else ""}
+
+<div class="ib"><strong>Alvo:</strong> {esc(domain)} &nbsp;|&nbsp;
+<strong>Gerado em:</strong> {now} &nbsp;|&nbsp;
+<strong>Próximo passo:</strong> <code>bash swarm.sh {esc(domain)} --osint-dir &lt;este_dir&gt;/</code></div>
+
+<h2 id="s2">Domain Intelligence</h2>
+{section("s2-dns", "DNS Records", "dns_records.txt", 100)}
+{section("s2-asn", "ASN / CIDR", "asn_info.txt", 20)}
+{section("s2-es", "Email Security (SPF / DMARC / DKIM)", "email_security.txt", 30)}
+
+<h2 id="s3">Subdomínios</h2>
+{section("s3-p", "Subdomínios Passivos", "subdomains_passive.txt", 500,
+         badge=str(sub_count))}
+{section("s3-l", "Subdomínios Ativos (dnsx)", "subdomains_live.txt", 500,
+         badge=str(live_count))}
+
+<h2 id="s4">E-mails &amp; Funcionários</h2>
+{section("s4-e", "E-mails Coletados", "emails.txt", 200,
+         badge=str(emails))}
+{section("s4-p", "Funcionários Identificados", "employees.txt", 100)}
+
+<h2 id="s5">URLs Históricas &amp; Endpoints</h2>
+{section("s5-ep", "Endpoints com Parâmetros / Dinâmicos", "interesting_endpoints.txt", 300,
+         badge=str(ep_count))}
+{section("s5-u", "URLs Históricas (amostra)", "historical_urls.txt", 100,
+         badge=str(urls))}
+
+<h2 id="s6">GitHub Dorking</h2>
+{section("s6-t", "trufflehog — Segredos em Repositórios Públicos", "github_leaks/trufflehog.json", 50)}
+
+<h2 id="s7">Vazamentos (HaveIBeenPwned)</h2>
+{section2("s7-l", "Leaked Credentials", "leaked_creds.csv",
+          "E-mail / Breach", "Data Classes / Fonte", 200,
+          badge=str(leaks) if leaks > 0 else None)}
+
+<h2 id="s8">Shodan Intelligence</h2>
+{section("s8-svc", "Serviços Expostos", "shodan/exposed_services.txt", 100)}
+{section("s8-cve", "CVEs Identificados via Shodan", "shodan/cves_from_shodan.txt", 100,
+         badge=str(cve_count) if cve_count > 0 else None)}
+
+<h2 id="s9">Cloud Surface</h2>
+{section2("s9-b", "Buckets S3 / Azure Identificados", "cloud/buckets_found.csv",
+          "Bucket", "Cloud / Status / URL", 100,
+          badge=str(buckets) if buckets > 0 else None)}
+{section2("s9-tk", "Candidatos a Subdomain Takeover", "cloud/takeover_candidates.csv",
+          "Subdomínio", "CNAME / Serviço / Status", 100,
+          badge=str(tkover) if tkover > 0 else None)}
+
+<h2 id="s10">Email Security</h2>
+{section("s10", "SPF / DMARC / DKIM / MX", "email_security.txt", 50)}
+
+</div><!-- .cnt -->
+<div class="ft">SWARM OSINT v{esc(version)} — USO EXCLUSIVO EM AMBIENTES COM RoE ASSINADO</div>
+</div><!-- .ctn -->
 </body>
 </html>"""
 
